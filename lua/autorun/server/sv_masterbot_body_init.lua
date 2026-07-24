@@ -743,7 +743,7 @@ function CMasterBotBody:AnimationUpkeep()
 	if (CurTime() < (self.m_nextThinkAnimate or 0)) then return end
 	self.m_nextThinkAnimate = CurTime() + ANIMATE_RATE
 
-    local speed = self.m_bot.loco:GetVelocity():Length()
+    local speed = math.Round(self.m_bot.loco:GetVelocity():Length())
     local seq
 	local lockBaseAnim = false
 	
