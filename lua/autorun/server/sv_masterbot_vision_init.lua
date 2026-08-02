@@ -540,6 +540,9 @@ function CMasterBotVision:IsLineOfFireClear(threat)
 	-- We can break it, continue shooting
 	if (IsValid(blocker) && (blocker:GetClass() == "func_breakable" || blocker:GetClass() == "prop_physics") && blocker:Health() > 0) then return true end
 	
+	-- Blocker is not func_breakable nor prop_physics, and we still don't our threat, don't fire
+	if (!seeHim && IsValid(blocker)) then return false end
+	
 	return true
 end
 

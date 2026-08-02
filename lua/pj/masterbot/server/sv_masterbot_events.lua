@@ -1,4 +1,11 @@
+local m_flEmitSound = 0
+local m_flWeaponFired = 0
+
 hook.Add("EntityFireBullets", "MasterBot_Server_OnWeaponFired", function(whoFired, weapon)
+	if (m_flWeaponFired > CurTime()) then return end
+	
+	m_flWeaponFired = CurTime() + CMasterBot.ConVar_WeaponFiredThrottle:GetFloat()
+	
 	if (IsValid(whoFired) && (whoFired:IsNextBot() || whoFired:IsPlayer() || whoFired:IsNPC())) then
 		whoFired.m_flWeaponFired = CurTime()
 		
@@ -54,6 +61,10 @@ hook.Add("PlayerDeath", "MasterBot_Server_PlayerDeath", function(victim, inflict
 end)
 
 hook.Add("EntityEmitSound", "MasterBot_Server_EntityEmitSound", function(data)
+	if (m_flEmitSound > CurTime()) then return end
+	
+	m_flEmitSound = CurTime() + CMasterBot.ConVar_EmitSoundThrottle:GetFloat()
+	
 	for i = 1, #CMasterBot.MasterBots do
 		local bot = CMasterBot.MasterBots[i]
 		if (IsValid(bot)) then

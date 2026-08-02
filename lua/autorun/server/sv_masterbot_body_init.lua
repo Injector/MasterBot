@@ -104,7 +104,7 @@ function CMasterBotBody:GetHeadAimTrackingInterval()
 		if (skill == 0) then return 1.0
 		elseif (skill == 1) then return 0.25
 		elseif (skill == 2) then return 0.1
-		elseif (skill == 2) then return 0.05 end
+		elseif (skill == 3) then return 0.05 end
 	end
 	
 	return 0.05
@@ -784,6 +784,7 @@ function CMasterBotBody:AnimationUpkeep()
 				end
 			else
 				if (!self.m_playedAnimGesture) then
+					--print("reload once")
 					local rs = self:GetSeq(self.m_bot.m_szAnimReload or "reload")
 					if (rs) then
 						self.m_bot:AddGestureSequence(rs, true)

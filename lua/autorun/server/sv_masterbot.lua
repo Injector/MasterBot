@@ -12,6 +12,12 @@ CMasterBot.MasterBots = {}
 
 local dir = "pj/masterbot/server/"
 
+AddCSLuaFile("pj/masterbot/client/cl_masterbot_main.lua")
+AddCSLuaFile("pj/masterbot/client/cl_masterbot_debug.lua")
+AddCSLuaFile("pj/masterbot/client/cl_masterbot_events.lua")
+AddCSLuaFile("pj/masterbot/client/cl_masterbot_flashlight.lua")
+AddCSLuaFile("pj/masterbot/client/cl_masterbot_laser.lua")
+
 include(dir .. "sv_masterbot_events.lua")
 include(dir .. "sv_masterbot_sound_data.lua")
 include(dir .. "sv_masterbot_sound_footsteps.lua")
@@ -179,6 +185,9 @@ function CMasterBot.GetDistanceDamage(damage, victim, attacker, doShortRangeIncr
 	
 	return damage + flDmgVariance
 end
+
+CMasterBot.ConVar_EmitSoundThrottle = CreateConVar("mb_event_emit_sound_throttle", "0.05", { FCVAR_ARCHIVE }, "Throttle event update, useful when there are a lot of MasterBots")
+CMasterBot.ConVar_WeaponFiredThrottle = CreateConVar("mb_event_weapon_fired_throttle", "0.05", { FCVAR_ARCHIVE }, "Throttle event update, useful when there are a lot of MasterBots")
 
 hook.Run("CMasterBot.Initialize")
 
