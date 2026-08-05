@@ -257,7 +257,7 @@ function BehMainAction:SelectTargetPoint(bot, subject)
 				if (rangeBetween > veryCloseRange) then
 					local timeToTravel = rangeBetween / missleSpeed
 					-- Мастерботы с нормальным уровнем сложности целятся в центр и учитывают угол, на харде и выше целятся в голову и учитывают угол тоже
-					local targetSpot = bot.m_iBotSkill == 1 and subject:WorldSpaceCenter() or subject:EyePos()
+					local targetSpot = bot.m_iBotSkill == CMasterBot.NORMAL and subject:WorldSpaceCenter() or subject:EyePos()
 					local leadTargetSpot = targetSpot + timeToTravel * subject:GetVelocity()
 					local elevationAngle = rangeBetween * 0.0001
 					if (elevationAngle > 45.0) then
@@ -294,6 +294,10 @@ function BehMainAction:SelectTargetPoint(bot, subject)
 			end
 		end
 	end
+	
+	--return subject:WorldSpaceCenter()
+	
+	-- Rely on reply in m_Intention (CMasterBotIntention)
 	return nil
 end
 

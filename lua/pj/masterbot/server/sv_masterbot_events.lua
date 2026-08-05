@@ -143,10 +143,29 @@ hook.Add("OnEntityCreated", "MasterBot_Server_OnEntityCreated_Fog", function(ent
 	CMasterBot.MapFogs[#CMasterBot.MapFogs + 1] = ent
 end)
 
+-- Using CMasterBot.Actors to skip large ents.Iterator
 hook.Add("OnEntityCreated", "MasterBot_Server_OnEntityCreated", function(ent)
 	-- Устанавливаем NWBool чтобы клиенты знали что этот NextBot на деле MasterBot
 	-- Set NWBool to let clients know that this NextBot is actually MasterBot
 	if (ent:IsMasterBot()) then
 		ent:SetNWBool("MasterBot", true)
+	end
+	
+	if (ent:IsPlayer() || ent:IsNPC() || ent:IsNextBot() || ent:IsMasterBot()) then
+		--print("Added to actor list", ent)
+		CMasterBot.Actors[#CMasterBot.Actors + 1] = ent
+	end
+end)
+
+hook.Add("EntityRemoved", "MasterBot_Server_EntityRemoved", function(ent, fullUpdate)
+	if (ent:IsPlayer() || ent:IsNPC() || ent:IsNextBot() || ent:IsMasterBot()) then
+		--print("Removed from actor list", ent)
+		for i = #CMasterBot.Actors, 1, -1 do
+			local actor = CMasterBot.Actors[i]
+			if (actor:EntIndex() == ent:EntIndex()) then
+				CMasterBot.Actors[i] = CMasterBot.Actors[#CMasterBot.Actors]
+				CMasterBot.Actors[#CMasterBot.Actors] = nil
+			end
+		end
 	end
 end)

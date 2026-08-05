@@ -9,6 +9,7 @@ CMasterBot.HARD = 2
 CMasterBot.EXPERT = 3
 
 CMasterBot.MasterBots = {}
+CMasterBot.Actors = {}
 
 local dir = "pj/masterbot/server/"
 

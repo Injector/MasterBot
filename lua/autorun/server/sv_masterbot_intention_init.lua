@@ -192,7 +192,7 @@ function CMasterBotIntention:SelectMoreDangerousThreat(me, threat1, threat2)
 	local threat = self:SelectMoreDangerousThreatInternal(me, threat1, threat2)
 	
 	-- Боты с легким уровнем сложности никогда не целятся в медика
-	if (self:GetBot().m_iBotSkill == nil or self:GetBot().m_iBotSkill == 0) then return threat end
+	if (self:GetBot().m_iBotSkill == nil or self:GetBot().m_iBotSkill == CMasterBot.EASY) then return threat end
 	
 	if (CurTime() > self.m_flNextRandomTime) then
 		self.m_flTCRandom     = math.random()
@@ -200,7 +200,7 @@ function CMasterBotIntention:SelectMoreDangerousThreat(me, threat1, threat2)
 	end
 	
 	-- Боты с нормальным уровнем сложности будут целиться в медика с 50% шансом. Шанс обновляется каждые 10 секунд
-	if (self:GetBot().m_iBotSkill == 1 && self.m_flTCRandom < 0.5) then return threat end
+	if (self:GetBot().m_iBotSkill == CMasterBot.NORMAL && self.m_flTCRandom < 0.5) then return threat end
 	
 	-- Боты с хард или экспертном уровнем сложности боты целятся сначало в медика которого хилит нашу цель
 	-- Если медика нету, он вернет оригинальный threat а не nil
@@ -212,8 +212,15 @@ function CMasterBotIntention:SelectTargetPoint(threat)
 	local answer = bot.m_Behavior:SelectTargetPoint(threat)
 	if (answer != nil) then return answer end
 	
-	local _, desiredPos = bot.m_Vision:IsLineOfSightClear(threat)
-	if (desiredPos != vector_origin) then return desiredPos end
+	local seeHim, visibleSpot, blocker = bot.m_Vision:IsLineOfSightClearToEntity(threat)
+	--print("Found visibleSpot", visibleSpot, seeHim, "eyepos", visibleSpot == threat:EyePos(), "worldspacecenter", visibleSpot == threat:WorldSpaceCenter())
+	
+	if (visibleSpot && visibleSpot != vector_origin) then
+		return visibleSpot
+	end
+	
+	-- local _, desiredPos = bot.m_Vision:IsLineOfSightClear(threat)
+	-- if (desiredPos != vector_origin) then return desiredPos end
 	
 	return threat:WorldSpaceCenter()
 end

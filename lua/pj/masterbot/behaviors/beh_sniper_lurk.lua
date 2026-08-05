@@ -601,13 +601,27 @@ function BehSniperLurk:SelectTargetPoint(bot, subject)
 	-- Hard/Expert
 	-- Целимся в точно в голову, скорость реакции и наводки зависит от уровня скилла бота
 	-- Aim for a head, reaction time and tracking interval depends on bot skill value
-	if (bot.m_iBotSkill >= 2) then
+	if (bot.m_iBotSkill >= CMasterBot.HARD) then
 		desiredAimSpot = subject:EyePos()
+		--desiredAimSpot = bot.m_Vision:GetHeadAimPos(subject)
 	-- Normal
 	-- Целимся примерно в голову, отклонение от головы примерно 9 хаммер юнитов или 0.17 метров или 17 сантиметров (9 * 0.01905)
 	-- Aim for a head, deviation from  the head is approximately 9 hammer units or 0.17 meters or 17 centimeters (9 * 0.01905)
-	elseif (bot.m_iBotSkill == 1) then
+	elseif (bot.m_iBotSkill == CMasterBot.NORMAL) then
 		desiredAimSpot = (subject:EyePos() + subject:EyePos() + subject:WorldSpaceCenter()) / 3.0
+	end
+	
+	-- Check head hitbox (either player model too small or head is blocked)
+	-- if (!bot.m_Vision:IsLineOfSightOnEntityHitbox(desiredAimSpot, subject)) then
+		-- -- Select any free spot
+		-- local _, newAim, _ = bot.m_Vision:IsLineOfSightClearToEntity(subject)
+		-- if (newAim && newAim != vector_origin) then
+			-- desiredAimSpot = newAim
+		-- end
+	-- end
+	
+	if (!bot.m_Vision:IsLineOfFireClearPos(subject:EyePos())) then
+		desiredAimSpot = subject:WorldSpaceCenter()
 	end
 	
 	local imperfectAimSpot = desiredAimSpot + err * s * up + err * c * side

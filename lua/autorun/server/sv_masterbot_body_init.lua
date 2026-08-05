@@ -131,6 +131,15 @@ function CMasterBotBody:GetMaxHeadAngularVelocity()
 end
 
 function CMasterBotBody:GetHeadAimSubjectLeadTime()
+	-- In singleplayer and listen servers it works okay, but on dedicated servers the bot's aim is arrives too late because of tick system or whatever
+	if (game.IsDedicated()) then
+		local skill = self.m_bot.m_iBotSkill or 0
+		local tick = engine.TickInterval()
+		if skill >= CMasterBot.EXPERT then return tick * 2.0 end
+		if skill == CMasterBot.HARD then return tick * 1.5 end
+		if skill == CMasterBot.NORMAL then return tick * 1.0 end
+		return 0
+	end
 	return 0
 end
 

@@ -513,6 +513,72 @@ CMasterBot.SoundTable["stalker_gasmask"] =
 	},
 }
 
+CMasterBot.SoundTable["stalker_zombied"] =
+{
+	["Attack"] =
+	{
+		"pj/stalker/zombied/human_01/attack/attack_1.mp3",
+		"pj/stalker/zombied/human_01/attack/attack_2.mp3",
+		"pj/stalker/zombied/human_01/attack/attack_3.mp3",
+		"pj/stalker/zombied/human_01/attack/attack_4.mp3",
+		"pj/stalker/zombied/human_01/attack/attack_5.mp3",
+		"pj/stalker/zombied/human_01/attack/attack_6.mp3",
+		"pj/stalker/zombied/human_01/attack/attack_7.mp3",
+		"pj/stalker/zombied/human_01/attack/attack_8.mp3",
+	},
+	["Flank"] =
+	{
+	},
+	["Enemy"] =
+	{
+		"pj/stalker/zombied/human_01/enemy/enemy_1.mp3",
+		"pj/stalker/zombied/human_01/enemy/enemy_2.mp3",
+		"pj/stalker/zombied/human_01/enemy/enemy_3.mp3",
+		"pj/stalker/zombied/human_01/enemy/enemy_4.mp3",
+		"pj/stalker/zombied/human_01/enemy/enemy_5.mp3",
+	},
+	["Death"] =
+	{
+		"pj/stalker/zombied/human_01/death/death_1.mp3",
+		"pj/stalker/zombied/human_01/death/death_2.mp3",
+		"pj/stalker/zombied/human_01/death/death_3.mp3",
+		"pj/stalker/zombied/human_01/death/death_4.mp3",
+		"pj/stalker/zombied/human_01/death/death_5.mp3",
+		"pj/stalker/zombied/human_01/death/death_6.mp3",
+	},
+	["Hit"] = 
+	{
+		"pj/stalker/zombied/human_01/hit/hit_1.mp3",
+		"pj/stalker/zombied/human_01/hit/hit_2.mp3",
+		"pj/stalker/zombied/human_01/hit/hit_3.mp3",
+		"pj/stalker/zombied/human_01/hit/hit_4.mp3",
+	},
+	["Idle"] =
+	{
+		"pj/stalker/monsters/zombie/zombie_idle_1.mp3",
+		"pj/stalker/monsters/zombie/zombie_idle_2.mp3",
+		"pj/stalker/monsters/zombie/zombie_idle_3.mp3",
+		"pj/stalker/monsters/zombie/zombie_idle_4.mp3",
+		"pj/stalker/monsters/zombie/zombie_idle_5.mp3",
+		"pj/stalker/monsters/zombie/zombie_idle_6.mp3",
+		"pj/stalker/monsters/zombie/zombie_idle_7.mp3",
+		"pj/stalker/monsters/zombie/zombie_idle_8.mp3",
+		"pj/stalker/monsters/zombie/zombie_idle_9.mp3",
+		"pj/stalker/monsters/zombie/zombie_idle_10.mp3",
+		"pj/stalker/monsters/zombie/zombie_idle_11.mp3",
+		"pj/stalker/monsters/zombie/zombie_idle_12.mp3",
+		"pj/stalker/monsters/zombie/zombie_idle_13.mp3",
+		"pj/stalker/monsters/zombie/zombie_idle_14.mp3",
+		"pj/stalker/monsters/zombie/zombie_idle_15.mp3",
+		"pj/stalker/monsters/zombie/zombie_idle_16.mp3",
+		"pj/stalker/monsters/zombie/zombie_idle_17.mp3",
+	},
+	["Grenade"] =
+	{
+	
+	},
+}
+
 CMasterBot.SoundTable["monster_zombie"] =
 {
 	["Attack"] =

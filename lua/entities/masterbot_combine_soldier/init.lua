@@ -102,6 +102,12 @@ function CMasterBotCombineVision:IsEnemy(ent)
 		end
 	end
 	
+	if (ent.m_iMasterBotTeam) then
+		if (self:GetBot().m_iMasterBotTeam) then
+			return self:GetBot().m_iMasterBotTeam == ent.m_iMasterBotTeam
+		end
+	end
+	
 	-- Остальные энтити для нас враги
 	return true
 end
@@ -283,6 +289,15 @@ function ENT:KeyValue(key, value)
 	elseif (key == "sniper") then
 		self.m_isSniper = tonumber(value) > 0
 		--self.m_sniperIsLookingAroundForEnemies = tonumber(value) > 0
+	elseif (key == "run_speed") then
+		self.m_flKVRunSpeed = tonumber(value)
+	elseif (key == "walk_speed") then
+		self.m_flKVWalkSpeed = tonumber(value)
+	elseif (key == "add_spread") then
+		local t = string.Split(value, ",")
+		self.m_vecAdditionalSpread = Vector(tonumber(t[1]), tonumber(t[2]), 0)
+	elseif (key == "remove_damage") then
+		self.m_iRemoveDamage = tonumber(value)
 	end
 	
 	self:InternalKeyValue(key, value)
@@ -333,6 +348,8 @@ function ENT:Initialize()
 	
 	self.m_iCommanderPriority = self.m_iCommanderPriority or 0
 	
+	self.m_bDamageFalloff = true
+	
 	if (self.m_flOverrideMaxVisionRange) then
 		self.m_Vision.m_maxVisionRange = self.m_flOverrideMaxVisionRange
 		self.m_Vision.m_maxVisionRangeSqr = self.m_flOverrideMaxVisionRange * self.m_flOverrideMaxVisionRange
@@ -377,6 +394,16 @@ function ENT:Initialize()
 	
 	self.m_Behavior = CMBBehavior:New(newAct, self)
 	
+	if (self.m_flKVRunSpeed) then
+		self.m_Locomotion:SetRunSpeed(self.m_flKVRunSpeed)
+		self.m_Locomotion:SetControlSpeedByButtons(true)
+	end
+	
+	if (self.m_flKVWalkSpeed) then
+		self.m_Locomotion:SetWalkSpeed(self.m_flKVWalkSpeed)
+		self.m_Locomotion:SetControlSpeedByButtons(true)
+	end
+	
 	-- Оружие
 	self.m_wpn = {}
 	self.m_wpn.m_flFireRange = FIRE_RANGE
@@ -389,7 +416,9 @@ function ENT:Initialize()
 	self.m_fireRestTime = 0
 	self.m_fireShootNum = 0
 	
-	self:SelectBotWeapon(self.m_iKVWeaponID or 1)
+	if (self.m_iKVWeaponID) then
+		self:SelectBotWeapon(self.m_iKVWeaponID)
+	end
 	
 	-- Прочее
 	self.m_flFootstep = CurTime()
@@ -586,6 +615,23 @@ function ENT:Think()
 		end
 	end
 	
+	if (self.m_flagUpdateKnowns) then
+		if (!self.m_flKnownUpdate) then
+			self.m_flKnownUpdate = 0
+		end
+		
+		if (CurTime() > self.m_flKnownUpdate) then
+			self.m_flKnownUpdate = CurTime() + 1.0
+			
+			for i = 1, #self.m_Vision.m_knownEntities do
+				local k = self.m_Vision.m_knownEntities[i]
+				if (k && !k:IsObsolete()) then
+					k:UpdatePosition()
+				end
+			end
+		end
+	end
+	
 	self:NextThink(CurTime())
 	
 	return true
@@ -760,14 +806,30 @@ function ENT:ThinkShoot()
 
 	local src = self.m_Body:GetEyePosition()
 	
+	local spread = Vector(self.m_wpn.m_flSpread, self.m_wpn.m_flSpread, 0)
+	
+	local dmg = self.m_wpn.m_iDamage
+	
+	if (self.m_vecAdditionalSpread) then
+		spread = spread + self.m_vecAdditionalSpread
+	end
+	
+	if (self.m_iRemoveDamage) then
+		dmg = dmg - self.m_iRemoveDamage
+	end
+	
+	if (dmg <= 0) then
+		dmg = 1
+	end
+	
 	self:FireBullets({
 		Num = self.m_wpn.m_iBulletsNum,
 		Src = src,
 		Dir = self.m_Body.m_angCurrentAngles:Forward(),
-		Spread = Vector(self.m_wpn.m_flSpread, self.m_wpn.m_flSpread, 0),
+		Spread = spread,
 		Tracer = 1,
 		Force = 2,
-		Damage = self.m_wpn.m_iDamage,
+		Damage = dmg,
 		AmmoType = "AR2",
 	})
 	
@@ -787,7 +849,11 @@ function ENT:ThinkShoot()
 	
 	if (szGestureShoot) then
 		--self:RemoveAllGestures()
-		self.m_Body:ReplayGesture(self.m_Body:GetSeq(szGestureShoot))
+		local seq = self.m_Body:GetSeq(szGestureShoot)
+		
+		if (seq) then
+			self.m_Body:ReplayGesture(seq)
+		end
 	end
     --self:EmitSound("Weapon_AR2.Single")
 end
@@ -1199,8 +1265,8 @@ function ENT:SelectBotWeapon(weaponType)
 		reload_duration = 2.8,
 		mag_size = 2,
 		fire_rate = 0.75,
-		damage = 9,
-		spread = 0.0775,
+		damage = 6,
+		spread = 0.09,
 		bullets = 7,
 		model = "models/weapons/w_annabelle.mdl",
 		fire = "weapons/shotgun/shotgun_fire6.wav",
@@ -1231,7 +1297,7 @@ function ENT:SelectBotWeapon(weaponType)
 		model = "models/weapons/w_rif_ak47.mdl",
 		fire = "Weapon_AK47.Single",
 		rest_time = { 0.3, 0.6 },
-		burst_num = { 4, 8 }
+		burst_num = { 4, 6 }
 		},
 		
 		[9] = { 
@@ -1253,7 +1319,7 @@ function ENT:SelectBotWeapon(weaponType)
 		reload_duration = 2.8,
 		mag_size = 45,
 		fire_rate = 0.054,
-		damage = 5,
+		damage = 4,
 		spread = 0.065,
 		bullets = 1,
 		model = "models/weapons/w_smg_mp5.mdl",
@@ -1414,6 +1480,20 @@ function ENT:SelectBotWeapon(weaponType)
 		model = "models/weapons/w_models/w_shotgun.mdl",
 		fire = "weapons/shotgun/shotgun_fire6.wav",
 		is_shotgun = true,
+		},
+		
+		[22] = { 
+		fire_range = 1400,
+		reload_duration = 2.8,
+		mag_size = 30,
+		fire_rate = 0.15,
+		damage = 5,
+		spread = 0.037,
+		bullets = 1,
+		model = "models/weapons/w_rif_ak47.mdl",
+		fire = "Weapon_AK47.Single",
+		rest_time = { 0.3, 0.6 },
+		burst_num = { 4, 8 }
 		},
 	}
 	

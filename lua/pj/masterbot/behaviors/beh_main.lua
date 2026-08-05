@@ -349,7 +349,7 @@ function BehReload:Update(bot, dt)
 	
 	if (bot.m_wpn && bot.m_wpn.m_bReloadByPart) then
 		if (bot.m_wpn.m_iClip1 >= bot.m_wpn.m_iMaxClip1) then
-			return self:Done("Reloaded")
+			return self:Done("Reload complete")
 		end
 		
 		return self:Continue()
@@ -366,6 +366,7 @@ function BehReload:Update(bot, dt)
 end
 
 function BehReload:OnEnd(bot, next)
+	bot.m_Body:ReleaseReloadButton()
     bot.m_isReloading = false
 end
 
@@ -425,10 +426,9 @@ function BehChase:OnStart(bot, prior)
 			
 			bCanSeeSpot = true
 			
-			tr = util.TraceLine({ start = vecEndPos, endpos = vecEndPos + Vector(0, 0, -50), filter = bot, mask = MASK_PLAYERSOLID })
+			tr = util.TraceLine({ start = vecEndPos, endpos = vecEndPos + Vector(0, 0, -90), filter = bot, mask = MASK_PLAYERSOLID })
 			
 			if (!tr.HitWorld) then
-				iFailedTimes = iFailedTimes + 1
 				-- Под нами нету земли, скип
 				continue
 			end
@@ -999,11 +999,15 @@ function BehELOF:Update(bot, dt)
 		
         return self:Continue()
     end
+	
+	if (bot.m_wpn && bot.m_wpn.m_bMeleeWeapon) then
+		return self:SuspendFor(BehMeleeAttack:New(), "Melee attack")
+	end
 
     local dist = bot:GetPos():Distance(enemy:GetPos())
 
     -- Ближний бой
-    if (dist <= MELEE_RANGE && CurTime() > (bot.m_meleeCooldown or 0)) then
+    if (!bot.m_flagNoMeleeAttack && dist <= MELEE_RANGE && CurTime() > (bot.m_meleeCooldown or 0)) then
         bot.m_meleeCooldown = CurTime() + 2.5
         bot:DoMelee(enemy)
         return self:SuspendFor(BehMeleeRetreat:New(), "Melee")
@@ -1090,17 +1094,19 @@ function BehELOF:DecideStrafe(bot, enemy)
 end
 
 function BehELOF:KeepSpacing(bot)
-    for _, m in ipairs(CMasterBotSquadManager:GetBotSquadMembers(bot)) do
-        if (IsValid(m) and m != bot) then
-            if (bot:GetPos():Distance(m:GetPos()) < SQUAD_SPACING) then
-                local away   = (bot:GetPos() - m:GetPos()):GetNormalized()
-                local target = bot:GetPos() + away * (SQUAD_SPACING * 1.5)
-                -- Маленький прямой толчок
-                bot.loco:Approach(target, 0.7)
-                return
-            end
-        end
-    end
+	local members = CMasterBotSquadManager:GetBotSquadMembers(bot)
+	for i = 1, #members do
+		local m = members[i]
+		if (IsValid(m) && m:EntIndex() != bot:EntIndex()) then
+			if (bot:GetPos():DistToSqr(m:GetPos()) < SQUAD_SPACING * SQUAD_SPACING) then
+				local away = bot:GetPos() - m:GetPos()
+				away:Normalize()
+				local target = bot:GetPos() + away * (SQUAD_SPACING * 1.5)
+				bot.loco:Approach(target, 0.7)
+				return
+			end
+		end
+	end
 end
 
 function BehELOF:OnResume(bot, intr)
@@ -1118,13 +1124,23 @@ function BehELOF:SelectTargetPoint(bot, subject)
 		
 		if (bot:GetPos():DistToSqr(subject:GetPos()) <= dist) then
 			-- Голова видна, целимся в нее, иначе в центр
-			if (bot.m_Vision:IsLineOfSightClearEntPos(subject, subject:EyePos(), true)) then
+			
+			-- Aim for head hitbox (some player models could be small and be lower than EyePos)
+			-- local headAim = bot.m_Vision:GetHeadAimPos(subject)
+			-- if (bot.m_Vision:IsLineOfSightOnEntityHitbox(headAim, subject)) then
+				-- return headAim
+			-- end
+			if (bot.m_Vision:IsLineOfFireClearPos(subject:EyePos())) then
 				return subject:EyePos()
 			end
+			
+			-- if (bot.m_Vision:IsLineOfSightClearEntPos(subject, subject:EyePos(), true)) then
+				-- return subject:EyePos()
+			-- end
 		end
 	end
 	
-	-- Далеко, используем дефолт
+	-- Далеко, используем дефолт в CMasterBotIntention
 	return nil
 end
 
@@ -1604,6 +1620,8 @@ function BehMeleeAttack:Update(bot, dt)
 		return self:Done("No enemy")
 	end
 	
+	bot.m_Body:PressShiftButton()
+	
 	if (bot:GetPos():DistToSqr(threat:GetPos()) > 70.0 * 70.0) then
 		if (CurTime() > self.m_destUpdate) then
 			self.m_destUpdate = CurTime() + 0.25
@@ -1733,13 +1751,17 @@ function BehCheckNoise:Update(bot, dt)
 	if (self.m_isArrivedFirtSpot) then
 		
 		if (self.m_retries < 3 && CurTime() > self.m_nextTryLook) then
-			local pos = bot.m_Body:GetEyePosition()
-			local randomDir = Vector(math.Rand(-1, 1), math.Rand(-1, 1), 0)
-			local pos = pos + randomDir * 100
+			-- local pos = bot.m_Body:GetEyePosition()
+			-- local randomDir = Vector(math.Rand(-1, 1), math.Rand(-1, 1), 0)
+			-- local pos = pos + randomDir * 100
 			
-			bot.m_Body:AimHeadTowardsPos(pos, CMasterBotBody.IMPORTANT, 2.0, "Looking around for a strange noise")
+			local angle = Angle(0, math.Rand(-180.0, 180.0), 0)
+			
+			local pos = bot.m_Body:GetEyePosition() + angle:Forward()
+			
+			bot.m_Body:AimHeadTowardsPos(pos, CMasterBotBody.IMPORTANT, 0.1, "Looking around for a strange noise")
 			self.m_retries = self.m_retries + 1
-			self.m_nextTryLook = CurTime() + 2.0
+			self.m_nextTryLook = CurTime() + math.Rand(0.33, 1.0)
 		end
 	end
 	

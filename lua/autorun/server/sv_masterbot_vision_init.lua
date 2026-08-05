@@ -103,6 +103,9 @@ end
 
 setmetatable(CKnownEntity, { __call = CKnownEntity.new })
 
+local LOS_MASK = bit.bor(MASK_BLOCKLOS_AND_NPCS, CONTENTS_IGNORE_NODRAW_OPAQUE)
+local LOF_MASK = MASK_SHOT --MASK_SOLID_BRUSHONLY
+
 CMasterBotVision = {}
 CMasterBotVision.__index = CMasterBotVision
 
@@ -165,10 +168,10 @@ end
 function CMasterBotVision:GetMinRecognizeTime()
 	local skill = self:GetBot().m_iBotSkill
 	if (skill) then
-		if (skill == 0) then return 1.0
-		elseif (skill == 1) then return 0.5
-		elseif (skill == 2) then return 0.3
-		elseif (skill == 3) then return 0.2 end
+		if (skill == CMasterBot.EASY) then return 1.0
+		elseif (skill == CMasterBot.NORMAL) then return 0.5
+		elseif (skill == CMasterBot.HARD) then return 0.3
+		elseif (skill == CMasterBot.EXPERT) then return 0.2 end
 	end
 	
 	return 1.0
@@ -466,153 +469,249 @@ function CMasterBotVision:IsAbleToSee(threat, checkFOV)
 	return self:IsVisibleEntityNoticed(threat)
 end
 
----@param Entity threat The entity to check bot
----@param Vector pos The entity's position to check (eye position, worldspacecenter, etc...)
----@param bool useHull Use TraceHull instead of TraceLine
----@return bool Return true if the ray to the given entity's point is unobstructed
-function CMasterBotVision:IsLineOfSightClearEntPos(threat, pos, useHull)
-	if (!useHull) then useHull = true end
+function CMasterBotVision:IsLookingAtPos(pos, cosTolerance)
+	local to = pos - self.m_bot.m_Body:GetEyePosition()
+	to:Normalize()
+	
+	local forward = self.m_bot.m_Body.m_angCurrentAngles:Forward()
+	
+	return to:Dot(forward) > cosTolerance
+end
+
+function CMasterBotVision:IsLookingAtEnt(ent, cosTolerance)
+	return self:IsLookingAtPos(ent:EyePos(), cosTolerance)
+end
+
+-- ==============================
+-- Line casts
+-- ==============================
+
+local GOOD_FRACTION = 0.99
+
+function CMasterBotVision:IsLineOfSightClearPos(pos)
+	if (!pos) then return false end
+
+	local me = self:GetBot()
+	local eye = me.m_Body:GetEyePosition()
+	local filter = { me }
+
+	local tr
+	if useHull then
+		tr = util.TraceHull({
+			start = eye,
+			endpos = pos,
+			filter = filter,
+			mask = LOS_MASK,
+			mins = self.m_vecHullMins,
+			maxs = self.m_vecHullMaxs,
+		})
+	else
+		tr = util.TraceLine({
+			start = eye,
+			endpos = pos,
+			filter = filter,
+			mask = LOS_MASK,
+		})
+	end
+	
+	return tr.Fraction >= GOOD_FRACTION && !tr.StartSolid
+end
+
+function CMasterBotVision:IsLineOfSightClearToEntity(ent) -- (ent, visibleSpot)
+	--local blocker = NULL
 	
 	local me = self:GetBot()
-	local traceFilter = { me }
+	local eye = me.m_Body:GetEyePosition()
+	--local filter = { me }
 	
-	local traceConfig = { start = me.m_Body:GetEyePosition(), endpos = pos, filter = traceFilter, mask = bit.bor(MASK_BLOCKLOS_AND_NPCS, CONTENTS_IGNORE_NODRAW_OPAQUE) }
+	-- Ignore other actors, include ourself to get fraction >= 1.0
+	local filter = self:TraceFilterIgnoreActors(self.m_bot)
 	
-	if (useHull) then
-		traceConfig = { start = me.m_Body:GetEyePosition(), endpos = pos, filter = traceFilter, mask = bit.bor(MASK_BLOCKLOS_AND_NPCS, CONTENTS_IGNORE_NODRAW_OPAQUE),
-			mins = self.m_vecHullMins, maxs = self.m_vecHullMaxs }
-	end
+	local candidates =
+	{
+		ent:WorldSpaceCenter(),
+		--self:GetHeadAimPos(ent),
+		ent:EyePos(),
+		ent:GetPos(),
+	}
+	
+	-- local str =
+	-- {
+		-- "WorldSpaceCenter",
+		-- "GetHeadAimPos",
+		-- "EyePos",
+		-- "GetPos",
+	-- }
 	
 	local tr = nil
 	
-	if (useHull) then
-		tr = util.TraceHull(traceConfig)
-	else
-		tr = util.TraceLine(traceConfig)
+	for i = 1, #candidates do
+		if (!candidates[i]) then continue end
+		tr = util.TraceLine({ start = eye, endpos = candidates[i], filter = filter, mask = LOS_MASK })
+		if (tr.Fraction >= GOOD_FRACTION && !tr.StartSolid) then
+			--print("found " .. str[i], candidates[i])
+			-- if (visibleSpot) then
+				-- visibleSpot = candidates[i]
+			-- end
+			return true, candidates[i], NULL
+		end
 	end
 	
-	return tr.Entity == threat
+	return false, vector_origin, tr and tr.Entity
 end
 
----@param Vector pos The position to check
----@param bool useHull Use TraceHull instead of TraceLine
----@return bool Return true if the ray to the given point is unobstructed
-function CMasterBotVision:IsLineOfSightClearPos(pos, useHull)
-	local me = self:GetBot()
-	local traceFilter = { me }
+function CMasterBotVision:IsLineOfSightClear(ent)
+	local see, aimPos, blocker = self:IsLineOfSightClearToEntity(ent)
 	
-	local traceConfig = { start = me.m_Body:GetEyePosition(), endpos = pos, filter = traceFilter, mask = bit.bor(MASK_BLOCKLOS_AND_NPCS, CONTENTS_IGNORE_NODRAW_OPAQUE) }
-	
-	if (useHull) then
-		traceConfig = { start = me.m_Body:GetEyePosition(), endpos = pos, filter = traceFilter, mask = bit.bor(MASK_BLOCKLOS_AND_NPCS, CONTENTS_IGNORE_NODRAW_OPAQUE),
-			mins = self.m_vecHullMins, maxs = self.m_vecHullMaxs }
+	if (see) then
+		return true, aimPos, blocker
 	end
 	
-	local tr = nil
-	
-	if (useHull) then
-		tr = util.TraceHull(traceConfig)
-	else
-		tr = util.TraceLine(traceConfig)
-	end
-	
-	return tr.Fraction >= 0.96 && !tr.StartSolid
+	return false, vector_origin, NULL
 end
 
----@param Vector pos The position to check
----@return bool Return true if the ray to the given point is unobstructed (no windows, fences, etc)
-function CMasterBotVision:IsLineOfFireClearPos(pos)
-	local see = self:IsLineOfSightClearPos(pos)
+function CMasterBotVision:IsLineOfFireClear(ent)
+	local candidates =
+	{
+		ent:WorldSpaceCenter(),
+		--self:GetHeadAimPos(ent),
+		ent:EyePos(),
+		ent:GetPos(),
+	}
 	
-	if (!see) then return false end
+	local seeHim = false
+	local blocker = NULL
 	
-	return true
+	--IsLineOfSightClearToEntity
+	
+	for i = 1, #candidates do
+		seeHim, blocker = self:IsLineOfFireClearEnt(ent, candidates[i])
+		
+		if (seeHim) then
+			return true, candidates[i]
+		elseif (!seeHim && IsValid(blocker) && (blocker:GetClass() == "func_breakable" || blocker:GetClass() == "prop_physics") && blocker:Health() > 0) then
+			return true, candidates[i]
+		end
+	end
+	
+	return seeHim
 end
 
----@param Entity threat The entity to check
----@return bool Return true if the ray to the given point is unobstructed (no windows, fences, etc)
-function CMasterBotVision:IsLineOfFireClear(threat)
-	local seeHim, seePos, blocker = self:IsLineOfSightClearEx(threat)
-	
-	if (!seeHim && !IsValid(blocker)) then return false end
-	
-	-- Мы можем это сломать, продолжаем стрелять
-	-- We can break it, continue shooting
-	if (IsValid(blocker) && (blocker:GetClass() == "func_breakable" || blocker:GetClass() == "prop_physics") && blocker:Health() > 0) then return true end
-	
-	-- Blocker is not func_breakable nor prop_physics, and we still don't our threat, don't fire
-	if (!seeHim && IsValid(blocker)) then return false end
-	
-	return true
+function CMasterBotVision:IsLineOfFireClearPos(pos, useHull)
+	return self:IsLineOfFireClearFromTo(self.m_bot.m_Body:GetEyePosition(), pos)
 end
 
--- Используем TraceHull вместо TraceLine, как как линия будет искать хитбоксы цели, а не огромную коробку колизии
--- Может получиться такая ситуация: если мы целимся линией в глаза цели EyePos(), и у него анимация физгана, то он будет фейлиться потому-что хитбокс головы находится не на уровне глаз EyePos()
--- Если же у него анимация пистолета, то он не будет фейлиться, потому-что хитбокс головы находится точно на уровне глаз EyePos()
--- We use TraceHull, not TraceLine, because line will search for hitboxes, not a big collision box
--- Example: if we aimg at threat's eye position and he's with physics gun animation, then TraceLine would fail because head's hitbox wouldn't be located on EyePos()
--- If he's with pistol animation, then it will not fail because head's hitbox will be located right in EyePos()
-
----@param Entity threat The entity to check if bot can clearly see it (nothing blocks bot's vision)
----@return bool Returns true and position that we can see of entity
-function CMasterBotVision:IsLineOfSightClear(threat)
-	local me = self:GetBot()
-	local traceFilter = { me }
-	local trConfig = { start = me.m_Body:GetEyePosition(), endpos = threat:WorldSpaceCenter(), filter = traceFilter, mask = MASK_SOLID + CONTENTS_HITBOX,
-		mins = self.m_vecHullMins, maxs = self.m_vecHullMaxs }
-	
-	local tr = util.TraceHull(trConfig)
-	
-	if (tr.Entity == threat) then
-		return true, threat:WorldSpaceCenter()
-	end
-	
-	trConfig.endpos = threat:EyePos()
-	tr = util.TraceHull(trConfig)
-	
-	if (tr.Entity == threat) then
-		return true, threat:EyePos()
-	end
-	
-	trConfig.endpos = threat:GetPos()
-	tr = util.TraceHull(trConfig)
-	
-	if (tr.Entity == threat) then
-		return true, threat:GetPos()
-	end
-	
-	return false, vector_origin
+function CMasterBotVision:IsLineOfFireClearEnt(ent, aimPos)
+	return self:IsLineOfFireClearFromToEnt(self.m_bot.m_Body:GetEyePosition(), ent, aimPos)
 end
 
--- Same as IsLineOfSightClear, but with blocker entity
-function CMasterBotVision:IsLineOfSightClearEx(threat)
-	local me = self:GetBot()
-	local traceFilter = { me }
-	local trConfig = { start = me.m_Body:GetEyePosition(), endpos = threat:WorldSpaceCenter(), filter = traceFilter, mask = MASK_SOLID + CONTENTS_HITBOX,
-		mins = self.m_vecHullMins, maxs = self.m_vecHullMaxs }
+function CMasterBotVision:IsLineOfFireClearFromTo(from, to)
+	local filter = self:TraceFilterIgnoreActors(self.m_bot)
 	
-	local tr = util.TraceHull(trConfig)
+	local tr = util.TraceLine({ start = from, endpos = to, filter = filter, mask = LOF_MASK })
 	
-	if (tr.Entity == threat) then
-		return true, threat:WorldSpaceCenter(), NULL
-	end
-	
-	trConfig.endpos = threat:EyePos()
-	tr = util.TraceHull(trConfig)
-	
-	if (tr.Entity == threat) then
-		return true, threat:EyePos(), NULL
-	end
-	
-	trConfig.endpos = threat:GetPos()
-	tr = util.TraceHull(trConfig)
-	
-	if (tr.Entity == threat) then
-		return true, threat:GetPos(), NULL
-	end
-	
-	return false, vector_origin, tr.Entity
+	return !tr.Hit, tr and tr.Entity
 end
+
+function CMasterBotVision:IsLineOfFireClearFromToEnt(from, ent, aimPos)
+	local filter = self:TraceFilterIgnoreActors(self.m_bot, 0, ent)
+	--local filter = { self.m_bot }
+	
+	local tr = util.TraceLine({ start = from, endpos = aimPos or ent:WorldSpaceCenter(), filter = filter, mask = LOF_MASK })
+	
+	--print("IsLineOfFireClearFromToEnt", tr.Hit, tr.Entity, aimPos, from)
+	
+	return (!tr.Hit || tr.Entity == ent), tr and tr.Entity
+end
+
+function CMasterBotVision:TraceFilterIgnoreFriendlyActors(me, collisionGroup, alsoIgnore)
+	local newActors = {}
+	newActors[#newActors + 1] = me
+	
+	for i = 1, #CMasterBot.Actors do
+		if (!self:IsEnemy(CMasterBot.Actors[i])) then
+			newActors[#newActors + 1] = CMasterBot.Actors[i]
+		end
+	end
+	
+	if (alsoIgnore) then
+		newActors[#newActors + 1] = alsoIgnore
+	end
+	
+	return newActors
+end
+
+function CMasterBotVision:TraceFilterIgnoreActors(me, collisionGroup, alsoIgnore)
+	if (alsoIgnore) then
+		local newActors = {}
+		newActors[#newActors + 1] = alsoIgnore
+		for i = 1, #CMasterBot.Actors do
+			-- our me also included in actors list
+			newActors[#newActors + 1] = CMasterBot.Actors[i]
+		end
+	end
+	
+	return CMasterBot.Actors
+end
+
+-- TODO: Optimize it
+-- This is really heavy resource code, calling this in IsLineOfSightClear can cause micro-lags
+-- We need to cache data (and clear it hooks when the entity is removed)
+-- function CMasterBotVision:GetHitGroupAimPos(ent, hitgroup)
+	-- if (!IsValid(ent)) then return nil end
+	-- if (!ent.GetHitBoxCount || !ent.GetHitBoxHitGroup) then return nil end
+	
+	-- local set = 0
+	-- if (ent.GetHitboxSet) then
+		-- set = ent:GetHitboxSet() or 0
+	-- end
+	
+	-- local count = ent:GetHitBoxCount(set)
+	-- if (!count || count <= 0) then return nil end
+	
+	-- for i = 0, count - 1 do
+		-- if (ent:GetHitBoxHitGroup(i, set) == hitgroup) then
+			-- local bone = ent:GetHitBoxBone(i, set)
+			-- if (!bone || bone < 0) then continue end
+			
+			-- local mins, maxs = ent:GetHitBoxBounds(i, set)
+			-- if (!mins || !maxs) then continue end
+			
+			-- local bpos, bang = ent:GetBonePosition(bone)
+			-- if (!bpos) then continue end
+			
+			-- local localCenter = LerpVector(0.5, mins, maxs)
+			-- return LocalToWorld(localCenter, angle_zero, bpos, bang or angle_zero)
+		-- end
+	-- end
+	-- --print("GetHitGroupAimPos fail")
+	-- return nil
+-- end
+
+-- function CMasterBotVision:GetHeadAimPos(ent)
+	-- --print("GetHeadAimPos res", self:GetHitGroupAimPos(ent, HITGROUP_HEAD))
+	-- return self:GetHitGroupAimPos(ent, HITGROUP_HEAD) or ent:EyePos()
+-- end
+
+-- function CMasterBotVision:IsLineOfSightOnEntityHitbox(pos, ent)
+	-- local me = self:GetBot()
+	-- local eye = me.m_Body:GetEyePosition()
+	-- local filter = { me }
+	-- --local filter = self:TraceFilterIgnoreActors(self.m_bot, 0, ent)
+
+	-- local tr = util.TraceLine({
+		-- start = eye,
+		-- endpos = pos,
+		-- filter = filter,
+		-- mask = LOS_MASK,
+	-- })
+	
+	-- if (tr.Entity && tr.Entity == ent) then
+		-- return true
+	-- end
+	
+	-- return false
+-- end
 
 function CMasterBotVision:GetTimeSinceVisible(team)
 	if (!team) then
@@ -661,8 +760,6 @@ function CMasterBotVision:GetFogObscuredRatio(range)
 	local fogStart = 0
 	local fogEnd = 0
 	local fogMaxDensity = 0
-	
-	CMasterBot.MapFogs[#CMasterBot.MapFogs + 1] = ent
 	
 	local n = #CMasterBot.MapFogs
 	for i = 1, n do
